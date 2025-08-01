@@ -8,38 +8,41 @@ pub struct Config {
     pub db_user: String,
     pub db_password: String,
     pub db_name: String,
+    pub db_url: String,
 }
 
 impl Config {
-    pub fn new() -> Self {
-        Config {
-            server_address: "0.0.0.0".to_string(),
-            server_port: 8080,
-            db_host: "localhost".to_string(),
-            db_port: 5432,
-            db_user: "user".to_string(),
-            db_password: "password".to_string(),
-            db_name: "seraph".to_string(),
-        }
-    }
-
     pub fn from_env() -> Self {
         dotenvy::dotenv().ok();
 
+        let server_address = env::var("SERVER_ADDRESS").unwrap();
+        let server_port: u16 = env::var("SERVER_PORT")
+            .unwrap()
+            .parse()
+            .expect("Invalid server port");
+        let db_host = env::var("DATABASE_HOST").unwrap();
+        let db_port: u16 = env::var("DATABASE_PORT")
+            .unwrap()
+            .parse()
+            .expect("Invalid database port");
+        let db_user = env::var("POSTGRES_USER").unwrap();
+        let db_password = env::var("POSTGRES_PASSWORD").unwrap();
+        let db_name = env::var("DATABASE_NAME").unwrap();
+
+        let db_url = format!(
+            "postgres://{}:{}@{}:{}/{}",
+            db_user, db_password, db_host, db_port, db_name
+        );
+
         Config {
-            server_address: env::var("SERVER_ADDRESS").unwrap(),
-            server_port: env::var("SERVER_PORT")
-                .unwrap()
-                .parse()
-                .expect("Invalid server port"),
-            db_host: env::var("DATABASE_HOST").unwrap(),
-            db_port: env::var("DATABASE_PORT")
-                .unwrap()
-                .parse()
-                .expect("Invalid database port"),
-            db_user: env::var("POSTGRES_USER").unwrap(),
-            db_password: env::var("POSTGRES_PASSWORD").unwrap(),
-            db_name: env::var("DATABASE_NAME").unwrap(),
+            server_address,
+            server_port,
+            db_host,
+            db_port,
+            db_user,
+            db_password,
+            db_name,
+            db_url,
         }
     }
 }
