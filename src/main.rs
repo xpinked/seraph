@@ -15,7 +15,10 @@ async fn hello(data: web::Data<AppState>) -> impl Responder {
 
 #[get("/posts/{id}/")]
 async fn get_post(id: web::Path<i32>, data: web::Data<AppState>) -> impl Responder {
-    let post = post::Entity::find_by_id(1).one(&*data.db).await.unwrap();
+    let post = post::Entity::find_by_id(id.into_inner())
+        .one(&*data.db)
+        .await
+        .unwrap();
 
     match post {
         Some(p) => HttpResponse::Ok().json(p),
