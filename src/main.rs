@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 mod config;
+mod post;
 
 use std::sync::Arc;
 
