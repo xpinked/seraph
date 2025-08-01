@@ -16,7 +16,7 @@ async fn main() -> std::io::Result<()> {
     }
     tracing_subscriber::fmt::init();
 
-    let config = config::Config::new();
+    let config = config::Config::from_env();
 
     HttpServer::new(|| {
         App::new()
