@@ -1,0 +1,47 @@
+# Rust
+/target
+**/*.rs.bk
+**/*.d
+**/*.rmeta
+**/*.lock
+incremental/
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+*.egg
+*.egg-info
+*.eggs
+*.coverage
+.coverage.*
+*.tox
+.tox/
+*.nox
+.nox/
+*.mypy_cache
+.mypy_cache/
+*.hypothesis
+.hypothesis/
+*.pytest_cache
+.pytest_cache/
+*.ipynb_checkpoints
+.ipynb_checkpoints/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env
+.venv
