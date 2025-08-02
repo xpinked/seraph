@@ -1,5 +1,6 @@
 use std::env;
 
+#[derive(Clone, Debug)]
 pub struct Config {
     pub server_address: String,
     pub server_port: u16,

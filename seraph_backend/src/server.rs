@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::code_nodes;
+use crate::code_nodes::Entity as CodeNode;
 use crate::config;
 use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware, web};
 use sea_orm::{Database, DatabaseConnection, EntityTrait};
@@ -12,7 +12,7 @@ async fn hello(data: web::Data<AppState>) -> impl Responder {
 
 #[get("/posts/{id}/")]
 async fn get_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Responder {
-    let post = code_nodes::Entity::find_by_id(id.into_inner())
+    let post = CodeNode::find_by_id(id.into_inner())
         .one(&*data.db)
         .await
         .unwrap();
@@ -26,6 +26,7 @@ async fn get_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
 #[derive(Clone, Debug)]
 struct AppState {
     db: Arc<DatabaseConnection>,
+    config: config::Config,
 }
 
 #[actix_web::main]
@@ -49,7 +50,10 @@ pub async fn server() -> std::io::Result<()> {
     tracing::info!("Connected to the database at {}", config.db_url);
 
     let _conn = Arc::new(conn);
-    let app_state = AppState { db: _conn.clone() };
+    let app_state = AppState {
+        db: _conn.clone(),
+        config: config.clone(),
+    };
 
     HttpServer::new(move || {
         App::new()
