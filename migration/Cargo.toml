@@ -10,6 +10,7 @@ path = "src/lib.rs"
 
 [dependencies]
 async-std = { version = "1", features = ["attributes", "tokio1"] }
+seraph_backend = { path = "../seraph_backend"}
 
 [dependencies.sea-orm-migration]
 version = "1.1.0"

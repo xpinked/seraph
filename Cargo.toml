@@ -4,19 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-actix-web = "4"
-bollard = "*"
-sea-orm = { version = "^1.1.0", features = [
-    "sqlx-postgres",
-    "runtime-tokio-native-tls",
-    "macros",
-    "mock",
-    "with-json",
-    "with-uuid",
-    "debug-print",
-    "with-time",
-] }
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-dotenvy = "0.15.7"
-tracing = "*"
-serde = { version = "1", features = ["derive"] }
+seraph_backend = { path = "./seraph_backend" }
+migration = { path = "./migration" }
+
+
+[workspace]
+members = [".", "seraph_backend", "migration"]

@@ -1,0 +1,72 @@
+use std::fmt::Display;
+
+use sea_orm::entity::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, DeriveActiveEnum, EnumIter)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "code_language")]
+pub enum CodeLanguage {
+    #[sea_orm(string_value = "python")]
+    Python,
+    #[sea_orm(string_value = "javascript")]
+    JavaScript,
+}
+
+impl Display for CodeLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CodeLanguage::Python => write!(f, "python"),
+            CodeLanguage::JavaScript => write!(f, "javascript"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, DeriveActiveEnum, EnumIter)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "output_type")]
+pub enum OutputType {
+    #[sea_orm(string_value = "string")]
+    String,
+    #[sea_orm(string_value = "number")]
+    Number,
+    #[sea_orm(string_value = "boolean")]
+    Boolean,
+    #[sea_orm(string_value = "array")]
+    Array,
+    #[sea_orm(string_value = "object")]
+    Object,
+    #[sea_orm(string_value = "not_output")]
+    NoOutput, // This can be used for nodes that do not produce an output
+}
+
+impl Display for OutputType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutputType::String => write!(f, "string"),
+            OutputType::Number => write!(f, "number"),
+            OutputType::Boolean => write!(f, "boolean"),
+            OutputType::Array => write!(f, "array"),
+            OutputType::Object => write!(f, "object"),
+            OutputType::NoOutput => write!(f, "not_output"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Deserialize, Serialize)]
+#[sea_orm(table_name = "code_nodes")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    #[serde(skip_deserializing)]
+    pub id: i32,
+
+    pub name: String,
+    pub function_name: String,
+    pub code: String,
+    pub output_name: String,
+    pub output_type: OutputType,
+    pub language: CodeLanguage,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
