@@ -5,6 +5,8 @@ FROM rust:latest
 WORKDIR /app
 
 # Copy the Cargo.toml and Cargo.lock files
+COPY seraph_backend/ ./seraph_backend
+COPY migration/ ./migration
 COPY Cargo.toml .
 
 # Copy the source code
