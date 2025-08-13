@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::code_nodes::{CodeLanguage, Entity as CodeNode};
+use crate::code_nodes::{CodeLanguage, Entity as CodeNode, Model as CodeNodeModel};
 use crate::config;
 use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware, web};
 use bollard::query_parameters::RemoveContainerOptions;
@@ -26,6 +26,20 @@ async fn get_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
     }
 }
 
+fn alter_code(node: &CodeNodeModel) -> String {
+    use unescape::unescape;
+
+    let unescaped_code = unescape(&node.code).unwrap();
+    let code_content = unescaped_code.trim_matches(char::from(0));
+
+    match node.language {
+        CodeLanguage::Python => format!("{}\nprint({}())", code_content, node.function_name),
+        CodeLanguage::JavaScript => {
+            format!("{}\nconsole.log({}());", code_content, node.function_name)
+        }
+    }
+}
+
 #[get("/code-node/{id}/run")]
 async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Responder {
     use bollard::Docker;
@@ -39,18 +53,12 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
     use tokio::fs::File;
     use tokio_tar as tar;
     use tokio_util::io::ReaderStream;
-    use unescape::unescape;
 
-    let node = CodeNode::find_by_id(id.into_inner())
-        .one(&*data.db)
-        .await
-        .unwrap();
-
-    if node.is_none() {
-        return HttpResponse::NotFound().body("Code node not found");
-    }
-
-    let node = node.unwrap();
+    let node = match CodeNode::find_by_id(id.into_inner()).one(&*data.db).await {
+        Ok(Some(node)) => node,
+        Ok(None) => return HttpResponse::NotFound().body("Code node not found"),
+        Err(_) => return HttpResponse::InternalServerError().body("Database error"),
+    };
 
     let docker = Docker::connect_with_defaults().unwrap();
 
@@ -84,12 +92,7 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
         ..Default::default()
     };
 
-    let unescaped_code = unescape(&node.code).unwrap();
-    let code_content = unescaped_code.trim_matches(char::from(0));
-    let altered_code = match node.language {
-        CodeLanguage::Python => format!("{}\nprint({}())", code_content, node.function_name),
-        CodeLanguage::JavaScript => format!("{}\nconsole.log({}());", code_content, node.function_name),
-    };
+    let altered_code = alter_code(&node);
 
     let file_path = format!("/tmp/{}.{}", node.name, extension);
     tokio::fs::write(&file_path, altered_code)
