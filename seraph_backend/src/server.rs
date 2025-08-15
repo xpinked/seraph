@@ -80,6 +80,7 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
     use bollard::query_parameters::LogsOptions;
     use bollard::query_parameters::StartContainerOptions;
     use bollard::query_parameters::UploadToContainerOptions;
+    use bollard::query_parameters::WaitContainerOptions;
     use futures_util::{StreamExt, TryFutureExt};
     use tokio::fs::File;
     use tokio_tar as tar;
@@ -117,7 +118,6 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
 
     let container = docker.create_container(Some(CreateContainerOptions::default()), container).await.unwrap();
 
-    // // Create a temporary tar file with the code content
     let tar_path = {
         let altered_code = alter_code(&node);
         let file_path = tempfile::NamedTempFile::new().unwrap();
@@ -137,15 +137,13 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
     let file = File::open(tar_path).map_ok(ReaderStream::new).try_flatten_stream();
     let body_stream = body_try_stream(file);
 
+    let _upload_options = UploadToContainerOptions {
+        path: "/tmp/".to_string(),
+        ..Default::default()
+    };
+
     docker
-        .upload_to_container(
-            &container.id,
-            Some(UploadToContainerOptions {
-                path: "/tmp/".to_string(),
-                ..Default::default()
-            }),
-            body_stream,
-        )
+        .upload_to_container(&container.id, Some(_upload_options), body_stream)
         .await
         .unwrap();
 
@@ -154,25 +152,29 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
         .await
         .unwrap();
 
+    docker
+        .wait_container(&container.id, Some(WaitContainerOptions::default()))
+        .collect::<Vec<_>>()
+        .await;
+
     let logs = docker
         .logs(
             &container.id,
             Some(LogsOptions {
+                follow: true,
                 stdout: true,
                 stderr: true,
-                follow: true,
                 ..Default::default()
             }),
         )
         .collect::<Vec<_>>()
         .await;
 
-    let mut output = String::new();
-    for log in logs {
-        if let Ok(log) = log {
-            output.push_str(&log.to_string());
-        }
-    }
+    let output: String = logs
+        .into_iter()
+        .filter_map(Result::ok)
+        .flat_map(|log| log.into_bytes().into_iter().map(|b| b as char))
+        .collect();
 
     docker
         .remove_container(&container.id, Some(RemoveContainerOptions::default()))
