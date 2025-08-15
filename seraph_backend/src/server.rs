@@ -112,33 +112,27 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
         working_dir: Some("/tmp".to_string()),
         image: Some(image_name.to_string()),
         cmd: Some(cmd),
-        // cmd: Some(vec![
-        //     "tail".to_string(),
-        //     "-f".to_string(),
-        //     "/dev/null".to_string(),
-        // ]),
-        // cmd: Some(vec![
-        //     "ls".to_string(),
-        //     "-la".to_string(),
-        // ]),
         ..Default::default()
     };
-
-    let altered_code = alter_code(&node);
-
-    let file_path = tempfile::NamedTempFile::new().unwrap();
-    tokio::fs::write(&file_path, altered_code).await.expect("Failed to write code to file");
 
     let container = docker.create_container(Some(CreateContainerOptions::default()), container).await.unwrap();
 
     // // Create a temporary tar file with the code content
-    let tar_path = tempfile::Builder::new().suffix(".tar").tempfile().unwrap().into_temp_path();
-    let tar_file = tokio::fs::File::create(&tar_path).await.unwrap();
-    let mut tar_builder = tar::Builder::new(tar_file);
-    tar_builder
-        .append_file(format!("{}.{}", node.name, extension), &mut File::open(&file_path).await.unwrap())
-        .await
-        .unwrap();
+    let tar_path = {
+        let altered_code = alter_code(&node);
+        let file_path = tempfile::NamedTempFile::new().unwrap();
+        tokio::fs::write(&file_path, altered_code).await.expect("Failed to write code to file");
+
+        let tar_path = tempfile::Builder::new().suffix(".tar").tempfile().unwrap().into_temp_path();
+        let tar_file = tokio::fs::File::create(&tar_path).await.unwrap();
+        let mut tar_builder = tar::Builder::new(tar_file);
+        tar_builder
+            .append_file(format!("{}.{}", node.name, extension), &mut File::open(&file_path).await.unwrap())
+            .await
+            .unwrap();
+
+        tar_path
+    };
 
     let file = File::open(tar_path).map_ok(ReaderStream::new).try_flatten_stream();
     let body_stream = body_try_stream(file);
