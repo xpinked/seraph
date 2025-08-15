@@ -4,7 +4,7 @@ use sea_orm_migration::{
     sea_orm::{ActiveEnum, DbBackend, Schema},
 };
 
-use seraph_backend::code_nodes::{CodeLanguage, OutputType};
+use seraph_backend::enums::{CodeLanguage, OutputType};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -15,13 +15,9 @@ impl MigrationTrait for Migration {
         let schema = Schema::new(DbBackend::Postgres);
 
         // Create the `code_language` enum type
-        manager
-            .create_type(schema.create_enum_from_active_enum::<CodeLanguage>())
-            .await?;
+        manager.create_type(schema.create_enum_from_active_enum::<CodeLanguage>()).await?;
 
-        manager
-            .create_type(schema.create_enum_from_active_enum::<OutputType>())
-            .await?;
+        manager.create_type(schema.create_enum_from_active_enum::<OutputType>()).await?;
 
         // Create the `code_nodes` table
         manager
@@ -34,16 +30,8 @@ impl MigrationTrait for Migration {
                     .col(string(CodeNodes::FunctionName).not_null())
                     .col(text(CodeNodes::Code).not_null())
                     .col(string(CodeNodes::OutputName).not_null())
-                    .col(
-                        ColumnDef::new(CodeNodes::OutputType)
-                            .custom(OutputType::name())
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(CodeNodes::Language)
-                            .custom(CodeLanguage::name())
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(CodeNodes::OutputType).custom(OutputType::name()).not_null())
+                    .col(ColumnDef::new(CodeNodes::Language).custom(CodeLanguage::name()).not_null())
                     .to_owned(),
             )
             .await
@@ -56,14 +44,10 @@ impl MigrationTrait for Migration {
             .await?;
 
         // Drop the `output_type` enum type
-        manager
-            .drop_type(Type::drop().name(OutputType::name()).to_owned())
-            .await?;
+        manager.drop_type(Type::drop().name(OutputType::name()).to_owned()).await?;
 
         // Drop the `code_language` enum type
-        manager
-            .drop_type(Type::drop().name(CodeLanguage::name()).to_owned())
-            .await
+        manager.drop_type(Type::drop().name(CodeLanguage::name()).to_owned()).await
     }
 }
 

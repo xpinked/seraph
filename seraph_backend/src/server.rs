@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use crate::code_nodes::{ActiveModel as CodeNodeActiveModel, CodeLanguage, Entity as CodeNode, Model as CodeNodeModel, OutputType};
+use crate::code_nodes::{ActiveModel as CodeNodeActiveModel, Entity as CodeNode, Model as CodeNodeModel};
 use crate::config;
+use crate::enums::{CodeLanguage, OutputType};
 use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware, post, web};
 use bollard::query_parameters::RemoveContainerOptions;
 use futures_util::io::BufWriter;
