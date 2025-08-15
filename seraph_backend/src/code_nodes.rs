@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, DeriveActiveEnum, EnumIter)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "code_language")]
+#[serde(rename_all = "lowercase")]
 pub enum CodeLanguage {
     #[sea_orm(string_value = "python")]
     Python,
@@ -23,6 +24,7 @@ impl Display for CodeLanguage {
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, DeriveActiveEnum, EnumIter)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "output_type")]
+#[serde(rename_all = "lowercase")]
 pub enum OutputType {
     #[sea_orm(string_value = "string")]
     String,

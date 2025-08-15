@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use crate::code_nodes::{CodeLanguage, Entity as CodeNode, Model as CodeNodeModel};
+use crate::code_nodes::{ActiveModel as CodeNodeActiveModel, CodeLanguage, Entity as CodeNode, Model as CodeNodeModel, OutputType};
 use crate::config;
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware, web};
+use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware, post, web};
 use bollard::query_parameters::RemoveContainerOptions;
 use futures_util::io::BufWriter;
-use sea_orm::{Database, DatabaseConnection, EntityTrait};
+use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, Set};
 use tokio::io::BufReader;
 
 #[get("/")]
@@ -15,10 +15,7 @@ async fn hello(data: web::Data<AppState>) -> impl Responder {
 
 #[get("/code-node/{id}/")]
 async fn get_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Responder {
-    let post = CodeNode::find_by_id(id.into_inner())
-        .one(&*data.db)
-        .await
-        .unwrap();
+    let post = CodeNode::find_by_id(id.into_inner()).one(&*data.db).await.unwrap();
 
     match post {
         Some(p) => HttpResponse::Ok().json(p),
@@ -26,10 +23,44 @@ async fn get_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CreateCodeNode {
+    name: String,
+    function_name: String,
+    code: String,
+    output_name: String,
+    output_type: OutputType,
+    language: CodeLanguage,
+}
+
+#[post("/code-node/")]
+async fn create_code_node(data: web::Data<AppState>, node: web::Json<CreateCodeNode>) -> impl Responder {
+    let node = node.into_inner();
+
+    let post = CodeNodeActiveModel {
+        name: Set(node.name),
+        function_name: Set(node.function_name),
+        code: Set(serde_json::to_string(&node.code).unwrap()),
+        output_name: Set(node.output_name),
+        output_type: Set(node.output_type),
+        language: Set(node.language),
+        ..Default::default()
+    };
+
+    match post.insert(&*data.db).await {
+        Ok(created_node) => HttpResponse::Created().json(created_node),
+        Err(err) => {
+            tracing::error!("Failed to create code node: {}", err);
+            HttpResponse::InternalServerError().body("Failed to create code node")
+        }
+    }
+}
+
 fn alter_code(node: &CodeNodeModel) -> String {
     use unescape::unescape;
 
-    let unescaped_code = unescape(&node.code).unwrap();
+    let _deserialized_code: String = serde_json::from_str(&node.code).unwrap();
+    let unescaped_code = unescape(&_deserialized_code).unwrap();
     let code_content = unescaped_code.trim_matches(char::from(0));
 
     match node.language {
@@ -76,6 +107,7 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
         CodeLanguage::Python => vec!["python".to_string(), format!("/tmp/{}.py", node.name)],
         CodeLanguage::JavaScript => todo!(),
     };
+
     let container = ContainerCreateBody {
         working_dir: Some("/tmp".to_string()),
         image: Some(image_name.to_string()),
@@ -94,36 +126,21 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
 
     let altered_code = alter_code(&node);
 
-    let file_path = format!("/tmp/{}.{}", node.name, extension);
-    tokio::fs::write(&file_path, altered_code)
-        .await
-        .expect("Failed to write code to file");
+    let file_path = tempfile::NamedTempFile::new().unwrap();
+    tokio::fs::write(&file_path, altered_code).await.expect("Failed to write code to file");
 
-    let container = docker
-        .create_container(Some(CreateContainerOptions::default()), container)
+    let container = docker.create_container(Some(CreateContainerOptions::default()), container).await.unwrap();
+
+    // // Create a temporary tar file with the code content
+    let tar_path = tempfile::Builder::new().suffix(".tar").tempfile().unwrap().into_temp_path();
+    let tar_file = tokio::fs::File::create(&tar_path).await.unwrap();
+    let mut tar_builder = tar::Builder::new(tar_file);
+    tar_builder
+        .append_file(format!("{}.{}", node.name, extension), &mut File::open(&file_path).await.unwrap())
         .await
         .unwrap();
 
-    // // Create a temporary tar file with the code content
-    let tar_path = format!("/tmp/{}.tar", node.name);
-    {
-        let tar_file = File::create(&tar_path).await.unwrap();
-        let mut tar_builder = tar::Builder::new(tar_file);
-
-        tar_builder
-            .append_file(
-                format!("{}.{}", node.name, extension),
-                &mut File::open(&file_path).await.unwrap(),
-            )
-            .await
-            .unwrap();
-    }
-
-    // // Upload the tar file to the container
-
-    let file = File::open(tar_path)
-        .map_ok(ReaderStream::new)
-        .try_flatten_stream();
+    let file = File::open(tar_path).map_ok(ReaderStream::new).try_flatten_stream();
     let body_stream = body_try_stream(file);
 
     docker
@@ -187,10 +204,7 @@ pub async fn server() -> std::io::Result<()> {
         std::env::set_var("RUST_LOG", "debug");
     }
 
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .with_test_writer()
-        .init();
+    tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).with_test_writer().init();
 
     let config = config::Config::from_env();
 
@@ -212,11 +226,10 @@ pub async fn server() -> std::io::Result<()> {
             .service(hello)
             .service(get_code_node)
             .service(run_code_node)
+            .service(create_code_node)
             .app_data(web::Data::new(app_state.clone()))
             .wrap(middleware::Logger::default())
-            .default_service(
-                web::route().to(|| async { HttpResponse::NotFound().body("Not Found") }),
-            )
+            .default_service(web::route().to(|| async { HttpResponse::NotFound().body("Not Found") }))
     })
     .bind((config.server_address, config.server_port))?
     .run()

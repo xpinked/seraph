@@ -26,3 +26,4 @@ futures-util = "0.3.31"
 tokio-util = "0.7.16"
 astral-tokio-tar = "0.5.2"
 unescape = "0.1.0"
+tempfile = '*'
