@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
-use crate::code_nodes::{ActiveModel as CodeNodeActiveModel, Entity as CodeNode, Model as CodeNodeModel};
+use crate::code_nodes::{ActiveModel as CodeNodeActiveModel, Entity as CodeNode};
 use crate::config;
 use crate::enums::{CodeLanguage, OutputType};
 use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware, post, web};
 use bollard::query_parameters::RemoveContainerOptions;
-use futures_util::io::BufWriter;
 use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, Set};
-use tokio::io::BufReader;
 
 #[get("/")]
-async fn hello(data: web::Data<AppState>) -> impl Responder {
+async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello, world!")
 }
 
@@ -57,21 +55,6 @@ async fn create_code_node(data: web::Data<AppState>, node: web::Json<CreateCodeN
     }
 }
 
-fn alter_code(node: &CodeNodeModel) -> String {
-    use unescape::unescape;
-
-    let _deserialized_code: String = serde_json::from_str(&node.code).unwrap();
-    let unescaped_code = unescape(&_deserialized_code).unwrap();
-    let code_content = unescaped_code.trim_matches(char::from(0));
-
-    match node.language {
-        CodeLanguage::Python => format!("{}\nprint({}())", code_content, node.function_name),
-        CodeLanguage::JavaScript => {
-            format!("{}\nconsole.log({}());", code_content, node.function_name)
-        }
-    }
-}
-
 #[get("/code-node/{id}/run")]
 async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Responder {
     use bollard::Docker;
@@ -84,7 +67,6 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
     use bollard::query_parameters::WaitContainerOptions;
     use futures_util::{StreamExt, TryFutureExt};
     use tokio::fs::File;
-    use tokio_tar as tar;
     use tokio_util::io::ReaderStream;
 
     let node = match CodeNode::find_by_id(id.into_inner()).one(&*data.db).await {
@@ -95,47 +77,16 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
 
     let docker = Docker::connect_with_defaults().unwrap();
 
-    let image_name = match node.language {
-        CodeLanguage::Python => "python:3.12",
-        CodeLanguage::JavaScript => "node:latest",
-    };
-
-    let extension = match node.language {
-        CodeLanguage::Python => "py",
-        CodeLanguage::JavaScript => "js",
-    };
-
-    let cmd = match node.language {
-        CodeLanguage::Python => vec!["python".to_string(), format!("/tmp/{}.py", node.name)],
-        CodeLanguage::JavaScript => todo!(),
-    };
-
     let container = ContainerCreateBody {
         working_dir: Some("/tmp".to_string()),
-        image: Some(image_name.to_string()),
-        cmd: Some(cmd),
+        image: Some(node.language.get_image_name().to_string()),
+        cmd: Some(node.get_command()),
         ..Default::default()
     };
 
     let container = docker.create_container(Some(CreateContainerOptions::default()), container).await.unwrap();
 
-    let tar_path = {
-        let altered_code = alter_code(&node);
-        let file_path = tempfile::NamedTempFile::new().unwrap();
-        tokio::fs::write(&file_path, altered_code).await.expect("Failed to write code to file");
-
-        let tar_path = tempfile::Builder::new().suffix(".tar").tempfile().unwrap().into_temp_path();
-        let tar_file = tokio::fs::File::create(&tar_path).await.unwrap();
-        let mut tar_builder = tar::Builder::new(tar_file);
-        tar_builder
-            .append_file(format!("{}.{}", node.name, extension), &mut File::open(&file_path).await.unwrap())
-            .await
-            .unwrap();
-
-        tar_path
-    };
-
-    let file = File::open(tar_path).map_ok(ReaderStream::new).try_flatten_stream();
+    let file = File::open(node.to_tar().await).map_ok(ReaderStream::new).try_flatten_stream();
     let body_stream = body_try_stream(file);
 
     let _upload_options = UploadToContainerOptions {
@@ -155,7 +106,7 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
 
     docker
         .wait_container(&container.id, Some(WaitContainerOptions::default()))
-        .collect::<Vec<_>>()
+        .for_each(|_| async {})
         .await;
 
     let logs = docker
@@ -190,6 +141,7 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Re
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 struct AppState {
     db: Arc<DatabaseConnection>,
     config: config::Config,

@@ -22,6 +22,22 @@ impl Display for CodeLanguage {
     }
 }
 
+impl CodeLanguage {
+    pub fn get_extension(&self) -> &str {
+        match self {
+            CodeLanguage::Python => "py",
+            CodeLanguage::JavaScript => "js",
+        }
+    }
+
+    pub fn get_image_name(&self) -> &str {
+        match self {
+            CodeLanguage::Python => "python:3.12",
+            CodeLanguage::JavaScript => "node:latest",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, DeriveActiveEnum, EnumIter)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "output_type")]
 #[serde(rename_all = "lowercase")]
