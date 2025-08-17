@@ -73,7 +73,7 @@ async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>, sender: we
         return HttpResponse::InternalServerError().body("Failed to send task to worker");
     }
 
-    HttpResponse::Ok().json(serde_json::json!({
+    HttpResponse::Accepted().json(serde_json::json!({
         "message": "Code node execution started",
         "task_id": task.id,
         "node_id": node.id,
