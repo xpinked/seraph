@@ -52,7 +52,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum CodeNodes {
+pub enum CodeNodes {
     // Renamed from Posts to CodeNodes
     Table,
     Id,

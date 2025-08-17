@@ -68,3 +68,31 @@ impl Display for OutputType {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, DeriveActiveEnum, EnumIter)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "code_result_status")]
+#[serde(rename_all = "lowercase")]
+pub enum ResultStatus {
+    #[sea_orm(string_value = "success")]
+    Success,
+    #[sea_orm(string_value = "error")]
+    Error,
+    #[sea_orm(string_value = "pending")]
+    Pending,
+    #[sea_orm(string_value = "running")]
+    Running,
+    #[sea_orm(string_value = "cancelled")]
+    Cancelled,
+}
+
+impl Display for ResultStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResultStatus::Success => write!(f, "success"),
+            ResultStatus::Error => write!(f, "error"),
+            ResultStatus::Pending => write!(f, "pending"),
+            ResultStatus::Running => write!(f, "running"),
+            ResultStatus::Cancelled => write!(f, "cancelled"),
+        }
+    }
+}
