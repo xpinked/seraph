@@ -8,6 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
+    pub task_id: uuid::Uuid,
     pub code_node_id: i32,
     pub status: ResultStatus,
     pub output: Option<String>,
