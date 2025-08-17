@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crate::code_nodes::{ActiveModel as CodeNodeActiveModel, Entity as CodeNode};
 use crate::config;
 use crate::enums::{CodeLanguage, OutputType};
+use crate::worker::CodeNodeTask;
 use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware, post, web};
-use bollard::query_parameters::RemoveContainerOptions;
 use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, Set};
+use tokio::sync::mpsc;
+use tokio::task;
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -56,87 +58,25 @@ async fn create_code_node(data: web::Data<AppState>, node: web::Json<CreateCodeN
 }
 
 #[get("/code-node/{id}/run")]
-async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Responder {
-    use bollard::Docker;
-    use bollard::body_try_stream;
-    use bollard::models::ContainerCreateBody;
-    use bollard::query_parameters::CreateContainerOptions;
-    use bollard::query_parameters::LogsOptions;
-    use bollard::query_parameters::StartContainerOptions;
-    use bollard::query_parameters::UploadToContainerOptions;
-    use bollard::query_parameters::WaitContainerOptions;
-    use futures_util::{StreamExt, TryFutureExt};
-    use tokio::fs::File;
-    use tokio_util::io::ReaderStream;
-
+async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>, sender: web::Data<mpsc::Sender<CodeNodeTask>>) -> impl Responder {
     let node = match CodeNode::find_by_id(id.into_inner()).one(&*data.db).await {
         Ok(Some(node)) => node,
         Ok(None) => return HttpResponse::NotFound().body("Code node not found"),
         Err(_) => return HttpResponse::InternalServerError().body("Database error"),
     };
 
-    let docker = Docker::connect_with_defaults().unwrap();
+    let task = CodeNodeTask::new(node.id, data.db.clone());
 
-    let container = ContainerCreateBody {
-        working_dir: Some("/tmp".to_string()),
-        image: Some(node.language.get_image_name().to_string()),
-        cmd: Some(node.get_command()),
-        ..Default::default()
-    };
-
-    let container = docker.create_container(Some(CreateContainerOptions::default()), container).await.unwrap();
-
-    let file = File::open(node.to_tar().await).map_ok(ReaderStream::new).try_flatten_stream();
-    let body_stream = body_try_stream(file);
-
-    let _upload_options = UploadToContainerOptions {
-        path: "/tmp/".to_string(),
-        ..Default::default()
-    };
-
-    docker
-        .upload_to_container(&container.id, Some(_upload_options), body_stream)
-        .await
-        .unwrap();
-
-    docker
-        .start_container(&container.id, Some(StartContainerOptions::default()))
-        .await
-        .unwrap();
-
-    docker
-        .wait_container(&container.id, Some(WaitContainerOptions::default()))
-        .for_each(|_| async {})
-        .await;
-
-    let logs = docker
-        .logs(
-            &container.id,
-            Some(LogsOptions {
-                follow: true,
-                stdout: true,
-                stderr: true,
-                ..Default::default()
-            }),
-        )
-        .collect::<Vec<_>>()
-        .await;
-
-    let output: String = logs
-        .into_iter()
-        .filter_map(Result::ok)
-        .flat_map(|log| log.into_bytes().into_iter().map(|b| b as char))
-        .collect();
-
-    docker
-        .remove_container(&container.id, Some(RemoveContainerOptions::default()))
-        .await
-        .unwrap();
+    tracing::info!("Sending task for code node with ID: {}", node.id);
+    if sender.send(task.clone()).await.is_err() {
+        tracing::error!("Failed to send task to worker");
+        return HttpResponse::InternalServerError().body("Failed to send task to worker");
+    }
 
     HttpResponse::Ok().json(serde_json::json!({
-        "output": output.trim_end_matches('\n'),
-        "language": node.language.to_string(),
-        "output_type": node.output_type.to_string(),
+        "message": "Code node execution started",
+        "task_id": task.id,
+        "node_id": node.id,
     }))
 }
 
@@ -170,6 +110,10 @@ pub async fn server() -> std::io::Result<()> {
         config: config.clone(),
     };
 
+    let (sender, receiver) = mpsc::channel(32);
+    tracing::info!("Starting worker thread");
+    task::spawn(crate::worker::worker(receiver));
+
     HttpServer::new(move || {
         App::new()
             .service(hello)
@@ -177,6 +121,7 @@ pub async fn server() -> std::io::Result<()> {
             .service(run_code_node)
             .service(create_code_node)
             .app_data(web::Data::new(app_state.clone()))
+            .app_data(web::Data::new(sender.clone()))
             .wrap(middleware::Logger::default())
             .default_service(web::route().to(|| async { HttpResponse::NotFound().body("Not Found") }))
     })
