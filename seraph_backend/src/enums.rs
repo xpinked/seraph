@@ -44,6 +44,8 @@ impl CodeLanguage {
 pub enum OutputType {
     #[sea_orm(string_value = "string")]
     String,
+    #[sea_orm(string_value = "bytes")]
+    Bytes,
     #[sea_orm(string_value = "number")]
     Number,
     #[sea_orm(string_value = "boolean")]
@@ -65,6 +67,7 @@ impl Display for OutputType {
             OutputType::Array => write!(f, "array"),
             OutputType::Object => write!(f, "object"),
             OutputType::NoOutput => write!(f, "not_output"),
+            OutputType::Bytes => write!(f, "bytes"),
         }
     }
 }
