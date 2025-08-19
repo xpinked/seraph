@@ -57,6 +57,25 @@ Before setting up the project, ensure you have the following installed:
 
 ---
 
+## Running migrations
+
+The project is using Sea ORM as the SQL migration manager,
+
+Either within the docker container or in local setup apply this steps.
+
+1. Make sure you have sea-orm-cli installed:
+   ```bash
+   cargo install sea-orm-cli
+   ```
+2. Check migration status
+   ```bash
+   sea-orm-cli migrate status
+   ```
+3. Apply pending migrations
+   ```bash
+   sea-orm-cli migrate up
+   ```
+
 ## Debugging Locally
 
 ### Using `RUST_LOG`
