@@ -28,3 +28,4 @@ astral-tokio-tar = "0.5.2"
 unescape = "0.1.0"
 tempfile = '*'
 uuid = { version = "*", features = ["v7", "v4"] }
+actix-cors = '*'

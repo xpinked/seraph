@@ -134,6 +134,7 @@ pub async fn server() -> std::io::Result<()> {
             .app_data(web::Data::new(app_state.clone()))
             .app_data(web::Data::new(sender.clone()))
             .wrap(middleware::Logger::default())
+            .wrap(actix_cors::Cors::default().allow_any_origin().allow_any_method().allow_any_header())
             .default_service(web::route().to(|| async { HttpResponse::NotFound().body("Not Found") }))
     })
     .bind((config.server_address, config.server_port))?
