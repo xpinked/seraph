@@ -44,15 +44,12 @@ pub fn alter_code(node: &Model) -> String {
 
 impl Model {
     pub fn get_command(&self) -> Vec<String> {
-        let args = vec![1, 2, 3];
-
         match self.language {
             CodeLanguage::Python => vec![
                 "python3".to_string(),
                 "main.py".to_string(),
                 self.name.clone(),
                 self.function_name.clone(),
-                serde_json::to_string(&args).unwrap(),
             ],
             CodeLanguage::JavaScript => todo!(),
         }
