@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,18 @@ pub enum CodeLanguage {
     Python,
     #[sea_orm(string_value = "javascript")]
     JavaScript,
+}
+
+impl FromStr for CodeLanguage {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "python" => Ok(CodeLanguage::Python),
+            "javascript" => Ok(CodeLanguage::JavaScript),
+            _ => Err(format!("Unsupported language: '{}'", s)),
+        }
+    }
 }
 
 impl Display for CodeLanguage {
@@ -32,7 +44,7 @@ impl CodeLanguage {
 
     pub fn get_image_name(&self) -> &str {
         match self {
-            CodeLanguage::Python => "python:3.12",
+            CodeLanguage::Python => "seraph_python:latest",
             CodeLanguage::JavaScript => "node:latest",
         }
     }

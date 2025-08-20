@@ -61,7 +61,7 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
         let docker = Docker::connect_with_defaults().unwrap();
 
         let container = ContainerCreateBody {
-            working_dir: Some("/tmp".to_string()),
+            working_dir: Some("/app/".to_string()),
             image: Some(node.language.get_image_name().to_string()),
             cmd: Some(node.get_command()),
             ..Default::default()
@@ -73,7 +73,7 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
         let body_stream = body_try_stream(file);
 
         let _upload_options = UploadToContainerOptions {
-            path: "/tmp/".to_string(),
+            path: "/app/".to_string(),
             ..Default::default()
         };
 
@@ -90,10 +90,16 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
             .await
             .unwrap();
 
-        docker
+        let container_results = docker
             .wait_container(&container.id, Some(WaitContainerOptions::default()))
-            .for_each(|_| async {})
+            .collect::<Vec<_>>()
             .await;
+
+        let exit_code = container_results
+            .into_iter()
+            .filter_map(Result::ok)
+            .find_map(|result| Some(result.status_code))
+            .unwrap_or(1); // Default to non-zero if no status code is found
 
         let logs = docker
             .logs(
@@ -119,7 +125,11 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
             .await
             .unwrap();
 
-        code_result.status = Set(crate::enums::ResultStatus::Success);
+        code_result.status = match exit_code {
+            0 => Set(crate::enums::ResultStatus::Success),
+            _ => Set(crate::enums::ResultStatus::Error),
+        };
+
         code_result.output = Set(Some(output.clone()));
         code_result.update(&*task.db).await.unwrap();
 
