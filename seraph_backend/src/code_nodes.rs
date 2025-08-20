@@ -39,18 +39,21 @@ pub fn alter_code(node: &Model) -> String {
     let unescaped_code = unescape(&_deserialized_code).unwrap();
     let code_content = unescaped_code.trim_matches(char::from(0));
 
-    match node.language {
-        CodeLanguage::Python => format!("{}\nprint({}())", code_content, node.function_name),
-        CodeLanguage::JavaScript => {
-            format!("{}\nconsole.log({}());", code_content, node.function_name)
-        }
-    }
+    return code_content.to_string();
 }
 
 impl Model {
     pub fn get_command(&self) -> Vec<String> {
+        let args = vec![1, 2, 3];
+
         match self.language {
-            CodeLanguage::Python => vec!["python".to_string(), format!("/tmp/{}.py", &self.name)],
+            CodeLanguage::Python => vec![
+                "python3".to_string(),
+                "main.py".to_string(),
+                self.name.clone(),
+                self.function_name.clone(),
+                serde_json::to_string(&args).unwrap(),
+            ],
             CodeLanguage::JavaScript => todo!(),
         }
     }
