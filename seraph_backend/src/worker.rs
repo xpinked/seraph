@@ -23,14 +23,16 @@ use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 pub struct CodeNodeTask {
     pub id: uuid::Uuid,
     pub node_id: i32,
+    pub args: Vec<String>,
     db: Arc<DatabaseConnection>,
 }
 
 impl CodeNodeTask {
-    pub fn new(node_id: i32, db: Arc<DatabaseConnection>) -> Self {
+    pub fn new(node_id: i32, db: Arc<DatabaseConnection>, args: Vec<String>) -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
             node_id,
+            args,
             db,
         }
     }
@@ -60,10 +62,15 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
 
         let docker = Docker::connect_with_defaults().unwrap();
 
+        let mut command = node.get_command();
+        command.push(serde_json::to_string(&task.args).unwrap());
+
+        tracing::info!("Command to run: {:?}", &command);
+
         let container = ContainerCreateBody {
             working_dir: Some("/app/".to_string()),
             image: Some(node.language.get_image_name().to_string()),
-            cmd: Some(node.get_command()),
+            cmd: Some(command),
             ..Default::default()
         };
 

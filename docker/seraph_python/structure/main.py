@@ -16,6 +16,7 @@ def main() -> None:
     module_name: str = args[0]
     function_name: str = args[1]
     function_args: list[str] = json.loads(args[2])
+    parsed_args = [json.loads(arg) for arg in function_args]
 
     module = importlib.import_module(name=module_name)
     function = getattr(module, function_name)
@@ -24,7 +25,7 @@ def main() -> None:
         msg = f"{function_name} is not a function"
         raise ValueError(msg)
 
-    result = function(*function_args)
+    result = function(*parsed_args)
 
     print(result, end="")
 

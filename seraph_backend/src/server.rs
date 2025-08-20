@@ -57,15 +57,26 @@ async fn create_code_node(data: web::Data<AppState>, node: web::Json<CreateCodeN
     }
 }
 
-#[get("/code-node/{id}/run")]
-async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>, sender: web::Data<mpsc::Sender<CodeNodeTask>>) -> impl Responder {
+#[derive(serde::Deserialize, serde::Serialize)]
+struct RunCodeNode {
+    #[serde(default)]
+    args: Vec<String>,
+}
+
+#[post("/code-node/{id}/run")]
+async fn run_code_node(
+    id: web::Path<i32>,
+    data: web::Data<AppState>,
+    sender: web::Data<mpsc::Sender<CodeNodeTask>>,
+    run_input: web::Json<RunCodeNode>,
+) -> impl Responder {
     let node = match CodeNode::find_by_id(id.into_inner()).one(&*data.db).await {
         Ok(Some(node)) => node,
         Ok(None) => return HttpResponse::NotFound().body("Code node not found"),
         Err(_) => return HttpResponse::InternalServerError().body("Database error"),
     };
 
-    let task = CodeNodeTask::new(node.id, data.db.clone());
+    let task = CodeNodeTask::new(node.id, data.db.clone(), run_input.args.clone());
 
     tracing::info!("Sending task for code node with ID: {}", node.id);
     if sender.send(task.clone()).await.is_err() {
