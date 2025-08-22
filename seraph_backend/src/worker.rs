@@ -24,16 +24,18 @@ pub struct CodeNodeTask {
     pub id: uuid::Uuid,
     pub node_id: i32,
     pub args: Vec<String>,
+    pub dependencies: Vec<String>,
     db: Arc<DatabaseConnection>,
 }
 
 impl CodeNodeTask {
-    pub fn new(node_id: i32, db: Arc<DatabaseConnection>, args: Vec<String>) -> Self {
+    pub fn new(node_id: i32, db: Arc<DatabaseConnection>, args: Vec<String>, dependencies: Vec<String>) -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
             node_id,
             args,
             db,
+            dependencies,
         }
     }
 }
@@ -62,8 +64,12 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
 
         let docker = Docker::connect_with_defaults().unwrap();
 
-        let mut command = node.get_command();
-        command.push(serde_json::to_string(&task.args).unwrap());
+        let _dependencies = match task.dependencies.is_empty() {
+            true => None,
+            false => Some(&task.dependencies),
+        };
+
+        let command = node.get_command(&task.args, _dependencies);
 
         tracing::info!("Command to run: {:?}", &command);
 
@@ -71,6 +77,7 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
             working_dir: Some("/app/".to_string()),
             image: Some(node.language.get_image_name().to_string()),
             cmd: Some(command),
+            // cmd: Some(vec!["tail".to_string(), "-f".to_string(), "/dev/null".to_string()]),
             ..Default::default()
         };
 
