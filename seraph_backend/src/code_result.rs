@@ -17,9 +17,11 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
+        fk_name = "fk-code_results-code_node_id",
         belongs_to = "super::code_nodes::Entity",
         from = "Column::CodeNodeId",
-        to = "super::code_nodes::Column::Id"
+        to = "super::code_nodes::Column::Id",
+        on_delete = "Cascade"
     )]
     CodeNode,
 }
