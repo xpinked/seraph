@@ -42,15 +42,45 @@ pub fn alter_code(node: &Model) -> String {
     return code_content.to_string();
 }
 
+pub struct Command {
+    command: Vec<String>,
+}
+impl Command {
+    pub fn new() -> Self {
+        Self { command: vec![] }
+    }
+
+    pub fn add(&mut self, arg: &str) -> &mut Self {
+        self.command.push(arg.to_string());
+        self
+    }
+
+    pub fn to_vec(&self) -> Vec<String> {
+        self.command.clone()
+    }
+}
+
 impl Model {
-    pub fn get_command(&self) -> Vec<String> {
+    pub fn get_command(&self, args: &Vec<String>, dependencies: Option<&Vec<String>>) -> Vec<String> {
         match self.language {
-            CodeLanguage::Python => vec![
-                "python3".to_string(),
-                "main.py".to_string(),
-                self.name.clone(),
-                self.function_name.clone(),
-            ],
+            CodeLanguage::Python => {
+                let mut command = Command::new();
+                command.add("uv").add("run").add("-q");
+
+                if let Some(deps) = dependencies {
+                    deps.into_iter().for_each(|dep| {
+                        command.add("--with").add(&dep);
+                    });
+                }
+
+                command.add("main.py").add(&self.name).add(&self.function_name);
+
+                args.into_iter().for_each(|arg| {
+                    command.add(&arg);
+                });
+
+                command.to_vec()
+            }
             CodeLanguage::JavaScript => todo!(),
         }
     }

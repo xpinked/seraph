@@ -61,6 +61,9 @@ async fn create_code_node(data: web::Data<AppState>, node: web::Json<CreateCodeN
 struct RunCodeNode {
     #[serde(default)]
     args: Vec<String>,
+
+    #[serde(default)]
+    dependencies: Vec<String>,
 }
 
 #[post("/code-node/{id}/run")]
@@ -76,7 +79,7 @@ async fn run_code_node(
         Err(_) => return HttpResponse::InternalServerError().body("Database error"),
     };
 
-    let task = CodeNodeTask::new(node.id, data.db.clone(), run_input.args.clone());
+    let task = CodeNodeTask::new(node.id, data.db.clone(), run_input.args.clone(), run_input.dependencies.clone());
 
     tracing::info!("Sending task for code node with ID: {}", node.id);
     if sender.send(task.clone()).await.is_err() {

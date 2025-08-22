@@ -10,12 +10,12 @@ BASE_DIR = Path(__file__).parent.absolute()
 def main() -> None:
     args = sys.argv[1:]
 
-    if len(args) != 3:
+    if len(args) < 2:
         raise ValueError("should have 3 args: module_name, function_name, function_args")
 
     module_name: str = args[0]
     function_name: str = args[1]
-    function_args: list[str] = json.loads(args[2])
+    function_args: list[str] = args[2:]
     parsed_args = [json.loads(arg) for arg in function_args]
 
     module = importlib.import_module(name=module_name)
