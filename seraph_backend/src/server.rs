@@ -4,8 +4,8 @@ use crate::code_nodes::{ActiveModel as CodeNodeActiveModel, Entity as CodeNode};
 use crate::config;
 use crate::enums::{CodeLanguage, OutputType};
 use crate::worker::CodeNodeTask;
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware, post, web};
-use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, Set};
+use actix_web::{App, HttpResponse, HttpServer, Responder, delete, get, middleware, post, web};
+use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, IntoActiveModel, Set};
 use tokio::sync::mpsc;
 use tokio::task;
 
@@ -53,6 +53,23 @@ async fn create_code_node(data: web::Data<AppState>, node: web::Json<CreateCodeN
         Err(err) => {
             tracing::error!("Failed to create code node: {}", err);
             HttpResponse::InternalServerError().body("Failed to create code node")
+        }
+    }
+}
+
+#[delete("/code-node/{id}/")]
+async fn delete_code_node(id: web::Path<i32>, data: web::Data<AppState>) -> impl Responder {
+    let node = match CodeNode::find_by_id(id.into_inner()).one(&*data.db).await {
+        Ok(Some(node)) => node,
+        Ok(None) => return HttpResponse::NotFound().body("Code node not found"),
+        Err(_) => return HttpResponse::InternalServerError().body("Database error"),
+    };
+
+    match node.into_active_model().delete(&*data.db).await {
+        Ok(_) => HttpResponse::NoContent().finish(),
+        Err(err) => {
+            tracing::error!("Failed to delete code node: {}", err);
+            HttpResponse::InternalServerError().body("Failed to delete code node")
         }
     }
 }
@@ -134,6 +151,7 @@ pub async fn server() -> std::io::Result<()> {
             .service(get_code_node)
             .service(run_code_node)
             .service(create_code_node)
+            .service(delete_code_node)
             .app_data(web::Data::new(app_state.clone()))
             .app_data(web::Data::new(sender.clone()))
             .wrap(middleware::Logger::default())
