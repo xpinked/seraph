@@ -4,7 +4,7 @@ use sea_orm_migration::{
     sea_orm::{ActiveEnum, DbBackend, Schema},
 };
 
-use seraph_backend::enums::{CodeLanguage, OutputType};
+use seraph_core::enums::{CodeLanguage, OutputType};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

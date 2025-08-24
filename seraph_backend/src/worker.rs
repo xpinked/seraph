@@ -9,15 +9,15 @@ use bollard::query_parameters::StartContainerOptions;
 use bollard::query_parameters::UploadToContainerOptions;
 use bollard::query_parameters::WaitContainerOptions;
 use futures_util::{StreamExt, TryFutureExt};
-use sea_orm::DatabaseConnection;
+use seraph_core::sea_orm::DatabaseConnection;
 use tokio::fs::File;
 use tokio::sync::mpsc;
 use tokio_util::io::ReaderStream;
 use uuid;
 
-use crate::code_nodes::Entity as CodeNode;
 use bollard::query_parameters::RemoveContainerOptions;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use seraph_core::code_nodes::Entity as CodeNode;
+use seraph_core::sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
 #[derive(Debug, Clone)]
 pub struct CodeNodeTask {
@@ -52,15 +52,15 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
             }
         };
 
-        let code_result = crate::code_result::ActiveModel {
+        let code_result = seraph_core::code_result::ActiveModel {
             code_node_id: Set(node.id),
-            status: Set(crate::enums::ResultStatus::Pending),
+            status: Set(seraph_core::enums::ResultStatus::Pending),
             output: Set(None),
             task_id: Set(task.id),
             ..Default::default()
         };
 
-        let mut code_result: crate::code_result::ActiveModel = code_result.insert(&*task.db).await.unwrap().into();
+        let mut code_result: seraph_core::code_result::ActiveModel = code_result.insert(&*task.db).await.unwrap().into();
 
         let docker = Docker::connect_with_defaults().unwrap();
 
@@ -96,8 +96,8 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
             .await
             .unwrap();
 
-        code_result.status = Set(crate::enums::ResultStatus::Running);
-        let mut code_result: crate::code_result::ActiveModel = code_result.update(&*task.db).await.unwrap().into();
+        code_result.status = Set(seraph_core::enums::ResultStatus::Running);
+        let mut code_result: seraph_core::code_result::ActiveModel = code_result.update(&*task.db).await.unwrap().into();
 
         docker
             .start_container(&container.id, Some(StartContainerOptions::default()))
@@ -140,8 +140,8 @@ pub async fn worker(mut receiver: mpsc::Receiver<CodeNodeTask>) {
             .unwrap();
 
         code_result.status = match exit_code {
-            0 => Set(crate::enums::ResultStatus::Success),
-            _ => Set(crate::enums::ResultStatus::Error),
+            0 => Set(seraph_core::enums::ResultStatus::Success),
+            _ => Set(seraph_core::enums::ResultStatus::Error),
         };
 
         code_result.output = Set(Some(output.clone()));

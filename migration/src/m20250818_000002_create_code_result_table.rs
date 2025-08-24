@@ -3,8 +3,8 @@ use sea_orm_migration::{
     sea_orm::{ActiveEnum, Schema},
 };
 
-use seraph_backend::code_result::Entity as CodeResultEntity;
-use seraph_backend::enums::ResultStatus;
+use seraph_core::code_result::Entity as CodeResultEntity;
+use seraph_core::enums::ResultStatus;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

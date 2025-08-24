@@ -1,0 +1,24 @@
+[package]
+name = "seraph_core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sea-orm = { version = "^1.1.0", features = [
+    "sqlx-postgres",
+    "runtime-tokio-native-tls",
+    "macros",
+    "mock",
+    "with-json",
+    "with-uuid",
+    "debug-print",
+    "with-time",
+] }
+dotenvy = "0.15.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "*"
+tokio = { version = "1.47.1", features = ["fs"] }
+astral-tokio-tar = "0.5.2"
+unescape = "0.1.0"
+tempfile = '*'
+uuid = { version = "*", features = ["v7", "v4"] }

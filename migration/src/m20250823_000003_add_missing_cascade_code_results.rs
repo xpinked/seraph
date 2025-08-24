@@ -2,7 +2,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::ForeignKeyAction;
 use sea_orm_migration::prelude::*;
 
-use seraph_backend::code_result::{Entity as CodeResultEntity, Relation as CodeResultRelation};
+use seraph_core::code_result::{Entity as CodeResultEntity, Relation as CodeResultRelation};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -25,7 +25,7 @@ impl MigrationTrait for Migration {
                 ForeignKey::create()
                     .name(_key_name)
                     .from(CodeResultEntity, _from)
-                    .to(seraph_backend::code_nodes::Entity, _to)
+                    .to(seraph_core::code_nodes::Entity, _to)
                     .on_delete(ForeignKeyAction::Cascade)
                     .to_owned(),
             )
@@ -48,7 +48,7 @@ impl MigrationTrait for Migration {
                 ForeignKey::create()
                     .name(_key_name)
                     .from(CodeResultEntity, _from)
-                    .to(seraph_backend::code_nodes::Entity, _to)
+                    .to(seraph_core::code_nodes::Entity, _to)
                     .to_owned(),
             )
             .await?;

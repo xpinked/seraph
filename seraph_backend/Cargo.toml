@@ -4,28 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+seraph_core = { path = "../seraph_core" }
 actix-web = "4"
 bollard = "*"
-sea-orm = { version = "^1.1.0", features = [
-    "sqlx-postgres",
-    "runtime-tokio-native-tls",
-    "macros",
-    "mock",
-    "with-json",
-    "with-uuid",
-    "debug-print",
-    "with-time",
-] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-dotenvy = "0.15.7"
 tracing = "*"
 serde = { version = "1", features = ["derive"] }
 serde_json = "*"
 tokio = { version = "1.47.1", features = ["fs"] }
 futures-util = "0.3.31"
 tokio-util = "0.7.16"
-astral-tokio-tar = "0.5.2"
-unescape = "0.1.0"
-tempfile = '*'
 uuid = { version = "*", features = ["v7", "v4"] }
 actix-cors = '*'

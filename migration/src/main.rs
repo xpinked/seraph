@@ -1,5 +1,5 @@
 use sea_orm_migration::prelude::*;
-use seraph_backend::config::Config;
+use seraph_core::config::Config;
 
 #[async_std::main]
 async fn main() {

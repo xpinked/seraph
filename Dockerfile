@@ -25,6 +25,7 @@ WORKDIR /app
 
 # Copy the Cargo.toml and Cargo.lock files
 COPY seraph_backend/ ./seraph_backend
+COPY seraph_core/ ./seraph_core
 COPY migration/ ./migration
 COPY Cargo.toml .
 
