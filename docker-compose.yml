@@ -5,7 +5,7 @@ x-base: &base
     dockerfile: ./Dockerfile
   restart: always
   depends_on:
-    # - redis
+    - redis
     - postgres
     # - rabbitmq
   environment:
@@ -35,10 +35,15 @@ x-base: &base
 services:
   seraph:
     <<: *base
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    command: "./target/release/seraph"
     ports:
       - "5000:5000"
+
+  seraph-worker:
+    <<: *base
+    command: "./target/release/code_nodes_consumer"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   postgres:
     image: postgres:17.4
@@ -67,13 +72,13 @@ services:
   #   networks:
   #     - "seraph"
 
-  # redis:
-  #   image: redis/redis-stack-server:7.4.0-v1
-  #   ports:
-  #     - "6379:6379"
-  #   restart: always
-  #   networks:
-  #     - "seraph"
+  redis:
+    image: redis/redis-stack-server:7.4.0-v1
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - "seraph"
 
   # rabbitmq:
   #   image: dcoya/seraph-rabbitmq:latest

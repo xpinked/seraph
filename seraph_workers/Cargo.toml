@@ -1,16 +1,23 @@
 [package]
-name = "seraph_backend"
+name = "seraph_workers"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 seraph_core = { path = "../seraph_core" }
-seraph_workers = { path = "../seraph_workers" }
-actix-web = "4"
+bollard = "*"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing = "*"
 serde = { version = "1", features = ["derive"] }
 serde_json = "*"
 tokio = { version = "1.47.1", features = ["fs"] }
+futures-util = "0.3.31"
+tokio-util = "0.7.16"
 uuid = { version = "*", features = ["v7", "v4"] }
-actix-cors = '*'
+broccoli_queue = { version = "*", features = ["redis"] }
+chrono = "*"
+time = "*"
+
+[[bin]]
+name = "code_nodes_consumer"
+path = "./src/code_nodes/bin.rs"

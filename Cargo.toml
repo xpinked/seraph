@@ -9,4 +9,4 @@ migration = { path = "./migration" }
 
 
 [workspace]
-members = [".", "seraph_backend", "migration", "seraph_core"]
+members = [".", "seraph_backend", "migration", "seraph_core", "seraph_workers"]
