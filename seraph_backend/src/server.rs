@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use crate::code_nodes::{ActiveModel as CodeNodeActiveModel, Entity as CodeNode};
-use crate::config;
-use crate::enums::{CodeLanguage, OutputType};
-use crate::worker::CodeNodeTask;
 use actix_web::{App, HttpResponse, HttpServer, Responder, delete, get, middleware, post, web};
-use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, IntoActiveModel, Set};
-use tokio::sync::mpsc;
-use tokio::task;
+use seraph_core::code_nodes::{ActiveModel as CodeNodeActiveModel, Entity as CodeNode};
+use seraph_core::config;
+use seraph_core::enums::{CodeLanguage, OutputType};
+use seraph_core::sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, IntoActiveModel, Set};
+use seraph_workers::broccoli_queue::queue::BroccoliQueue;
+use seraph_workers::code_nodes as code_nodes_worker;
+use tracing::instrument::WithSubscriber;
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -84,37 +84,35 @@ struct RunCodeNode {
 }
 
 #[post("/code-node/{id}/run")]
-async fn run_code_node(
-    id: web::Path<i32>,
-    data: web::Data<AppState>,
-    sender: web::Data<mpsc::Sender<CodeNodeTask>>,
-    run_input: web::Json<RunCodeNode>,
-) -> impl Responder {
+async fn run_code_node(id: web::Path<i32>, data: web::Data<AppState>, run_input: web::Json<RunCodeNode>) -> impl Responder {
     let node = match CodeNode::find_by_id(id.into_inner()).one(&*data.db).await {
         Ok(Some(node)) => node,
         Ok(None) => return HttpResponse::NotFound().body("Code node not found"),
         Err(_) => return HttpResponse::InternalServerError().body("Database error"),
     };
 
-    let task = CodeNodeTask::new(node.id, data.db.clone(), run_input.args.clone(), run_input.dependencies.clone());
+    let task = code_nodes_worker::CodeNodeTask::new(node.id, run_input.args.clone(), run_input.dependencies.clone());
 
     tracing::info!("Sending task for code node with ID: {}", node.id);
-    if sender.send(task.clone()).await.is_err() {
+
+    if code_nodes_worker::publisher(&*data.queue, vec![task.clone()], None).await.is_err() {
         tracing::error!("Failed to send task to worker");
         return HttpResponse::InternalServerError().body("Failed to send task to worker");
     }
 
     HttpResponse::Accepted().json(serde_json::json!({
         "message": "Code node execution started",
-        "task_id": task.id,
-        "node_id": node.id,
+        "task_id": &task.id,
+        "task_name": &task.task_name,
+        "node_id": &node.id,
     }))
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[allow(dead_code)]
 struct AppState {
     db: Arc<DatabaseConnection>,
+    queue: Arc<BroccoliQueue>,
     config: config::Config,
 }
 
@@ -136,14 +134,22 @@ pub async fn server() -> std::io::Result<()> {
     tracing::info!("Connected to the database at {}", config.db_url);
 
     let _conn = Arc::new(conn);
+
+    let _broker = BroccoliQueue::builder(&config.redis_url)
+        .pool_connections(5)
+        .failed_message_retry_strategy(Default::default())
+        .build()
+        .with_current_subscriber()
+        .await
+        .expect("Failed to create Broccoli queue");
+
+    let broker = Arc::new(_broker);
+
     let app_state = AppState {
         db: _conn.clone(),
+        queue: broker.clone(),
         config: config.clone(),
     };
-
-    let (sender, receiver) = mpsc::channel(32);
-    tracing::info!("Starting worker thread");
-    task::spawn(crate::worker::worker(receiver));
 
     HttpServer::new(move || {
         App::new()
@@ -153,7 +159,6 @@ pub async fn server() -> std::io::Result<()> {
             .service(create_code_node)
             .service(delete_code_node)
             .app_data(web::Data::new(app_state.clone()))
-            .app_data(web::Data::new(sender.clone()))
             .wrap(middleware::Logger::default())
             .wrap(actix_cors::Cors::default().allow_any_origin().allow_any_method().allow_any_header())
             .default_service(web::route().to(|| async { HttpResponse::NotFound().body("Not Found") }))

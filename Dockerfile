@@ -25,14 +25,20 @@ WORKDIR /app
 
 # Copy the Cargo.toml and Cargo.lock files
 COPY seraph_backend/ ./seraph_backend
+COPY seraph_core/ ./seraph_core
+COPY seraph_workers/ ./seraph_workers
 COPY migration/ ./migration
 COPY Cargo.toml .
+
+RUN cargo install sea-orm-cli
 
 # Copy the source code
 COPY src ./src
 
-# Build the application
-RUN cargo build --release
+# Build the backend
+RUN cargo build --release --bin seraph
 
-# Set the command to run the application
-CMD ["./target/release/seraph"]
+# Build workers
+RUN cd ./seraph_workers/ && cargo build --release --bin code_nodes_consumer && cd ..
+
+
